@@ -266,7 +266,7 @@ class Call(PyTgCalls):
             if mode == "video"
             else MediaStream(
                 file_path,
-                AudioQuality.STUDIO
+                AudioQuality.STUDIO,
                 additional_ffmpeg_parameters=f"-ss {to_seek} -to {duration}",
             )
         )
