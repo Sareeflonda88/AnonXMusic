@@ -190,8 +190,8 @@ class Call(PyTgCalls):
         stream = (
             MediaStream(
                 out,
-                audio_parameters=AudioParameters.from_quality(AudioQuality.STUDIO),
-                video_parameters=VideoParameters.from_quality(VideoQuality.SD_480p),
+                AudioQuality.STUDIO,
+                VideoQuality.SD_480p,
                 additional_ffmpeg_parameters=f"-ss {played} -to {duration}",
             )
             if playing[0]["streamtype"] == "video"
