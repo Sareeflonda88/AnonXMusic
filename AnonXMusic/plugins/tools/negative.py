@@ -1,62 +1,60 @@
+# bot.py
 import logging
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Poll
 from pyrogram.enums import PollType
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from AnonXMusic import app 
-
-# Enable logging for debugging
-logging.basicConfig(level=logging.INFO)
+from AnonXMusic import app, LOGGER
 
 
-# Define some quiz questions
-questions = [
-    {
-        "question": "What is the capital of France?",
-        "options": ["Paris", "London", "Berlin", "Madrid"],
-        "correct_answer": "Paris"
-    },
-    {
-        "question": "What is 2 + 2?",
-        "options": ["3", "4", "5", "6"],
-        "correct_answer": "4"
-    },
-    {
-        "question": "Who is the CEO of Tesla?",
-        "options": ["Elon Musk", "Jeff Bezos", "Bill Gates", "Mark Zuckerberg"],
-        "correct_answer": "Elon Musk"
-    }
-]
+# Add question handler
+@app.on_message(filters.command("add"))
+async def add_question(client, message):
+    await message.reply(
+        "Please send the question for the quiz. For example: What is 2 + 2?"
+    )
+    await message.reply(
+        "You can cancel the question addition process anytime by sending /cancel."
+    )
 
-# Command to start the quiz
-@app.on_message(filters.command("quiz"))
-def send_quiz(client, message):
-    for q in questions:
-        options = q["options"]
-        question_text = q["question"]
+    # Await the question input
+    question_response = await client.listen(message.chat.id)
+    question = question_response.text
 
-        # Create Inline keyboard for answers
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(option, callback_data=option) for option in options]
-        ])
+    # Ask for possible answers
+    await message.reply("Please send the options (e.g., A) 4, B) 5, C) 6).")
 
-        # Send the quiz
-        app.send_poll(
-            chat_id=message.chat.id,
-            question=question_text,
-            options=options,
-            type=PollType.QUIZ,
-            correct_option_id=options.index(q["correct_answer"]),
-            explanation=f"The correct answer is: {q['correct_answer']}",
-            explanation_parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
+    options_response = await client.listen(message.chat.id)
+    options = options_response.text.split(", ")
 
-# Handle quiz responses
+    # Ask for the correct answer
+    await message.reply("Please send the correct option (e.g., A).")
+
+    correct_answer_response = await client.listen(message.chat.id)
+    correct_answer = correct_answer_response.text
+
+    # Send the poll to the user
+    poll_options = [InlineKeyboardButton(option, callback_data=option) for option in options]
+    poll_keyboard = InlineKeyboardMarkup([[button] for button in poll_options])
+
+    await message.reply(
+        question,
+        reply_markup=poll_keyboard,
+        poll=Poll(type=PollType.QUIZ, options=options, correct_option_id=options.index(correct_answer)),
+    )
+
+    await message.reply("Your quiz question has been sent!")
+
+# Cancel command handler
+@app.on_message(filters.command("cancel"))
+async def cancel(client, message):
+    await message.reply("Question addition process has been canceled.")
+
+# Poll answer handler
 @app.on_poll_answer()
-def handle_poll_answer(client, poll_answer):
-    user_answer = poll_answer.option_ids[0]  # the user's selected option
-    correct_answer = questions[poll_answer.poll_id]["correct_answer"]
-    if user_answer == correct_answer:
-        client.send_message(poll_answer.user.id, "Correct!")
-    else:
-        client.send_message(poll_answer.user.id, f"Wrong! The correct answer is {correct_answer}.")
+async def handle_poll_answer(client, poll_answer):
+    # Handle user answers here
+    # poll_answer.user.id contains the user ID, poll_answer.option_ids contains the selected options
+    user_id = poll_answer.user.id
+    selected_option = poll_answer.option_ids[0]
+    # You can store the results or respond based on the selected option
+    await client.send_message(user_id, f"You selected option: {selected_option}")
