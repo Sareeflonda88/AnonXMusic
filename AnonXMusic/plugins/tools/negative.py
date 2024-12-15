@@ -128,19 +128,22 @@ async def play_quiz(client, message: Message):
 
             # Wait for the user's response
             try:
-                answer_message = await app.listen(message.chat.id, timeout=time_limit)
-                if answer_message.text.isdigit():
-                    selected_option = int(answer_message.text) - 1
-                    if selected_option == correct_answer:
-                        score += 4
-                        await message.reply("✅ Correct! You earned +4 points.")
-                    else:
-                        score -= 0.25
-                        await message.reply(f"❌ Wrong! The correct answer was option {correct_answer + 1}. You lost 0.25 points.")
-                else:
-                    await message.reply("❌ Invalid response! No points deducted.")
-            except asyncio.TimeoutError:
-                await message.reply("⏰ Time's up! Moving to the next question.")
+            # Wait for the user's response within the time limit
+                 answer_message = await app.listen(message.chat.id, timeout=time_limit)
+    
+            # Ensure the answer_message is valid and contains text
+            if answer_message and answer_message.text and answer_message.text.isdigit():
+                 selected_option = int(answer_message.text) - 1
+            if selected_option == correct_answer:
+            score += 4
+                 await message.reply("✅ Correct! You earned +4 points.")
+          else:
+              score -= 0.25
+                 await message.reply(f"❌ Wrong! The correct answer was option {correct_answer + 1}. You lost 0.25 points.")
+          else:
+                 await message.reply("❌ Invalid response! No points deducted.")
+        except asyncio.TimeoutError:
+                 await message.reply("⏰ Time's up! Moving to the next question.")
 
         except Exception as e:
             # Handle unexpected errors, e.g., issues with sending the poll
