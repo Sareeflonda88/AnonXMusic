@@ -1,154 +1,104 @@
-import asyncio
-import pickle
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, Poll
-from AnonXMusic import app
+from pyrogram.types import Poll, PollAnswer
+from AnonXMusic import app 
+
+# Store quiz data and user scores
+quiz_data = {
+    "questions": [],
+    "scores": {},  # user_id: score
+    "current_question": 0,
+    "group_id": None,
+}
+
+NEGATIVE_MARKING = -1  # Penalty for incorrect answers
 
 
-ADMIN_IDS = [7648939888]  # Replace with your Telegram user ID(s)
-
-# Load data (scores, quiz progress, and questions)
-try:
-    with open("data.pkl", "rb") as f:
-        data = pickle.load(f)
-except FileNotFoundError:
-    data = {"scores": {}, "progress": {}, "questions": {}, "titles": {}, "time_limits": {}}
-
-# Save data
-def save_data():
-    with open("data.pkl", "wb") as f:
-        pickle.dump(data, f)
-
-# Quiz Command with Title, Time, and Poll
-@app.on_message(filters.command("quiz"))
-async def quiz_command(client, message: Message):
-    user_id = message.from_user.id
-
-    # Step 1: Ask for the quiz title
-    await message.reply("🎯 Let's start by setting a title for your quiz. Please send the quiz title:")
-    try:
-        title_message = await app.listen(message.chat.id, timeout=60)
-        title = title_message.text
-        data["titles"][user_id] = title
-        data["questions"][user_id] = []
-        save_data()
-        await message.reply(f"✅ Quiz title set to: {title}\n\nNow, let's set a time limit for each question.")
-
-        # Step 2: Ask for time limit
-        await message.reply("⏱ Please specify the time limit for each question (in seconds, e.g., 30 for 30 seconds):")
-        time_message = await app.listen(message.chat.id, timeout=60)
-
-        if not time_message.text.isdigit():
-            await message.reply("❌ Invalid input! The time limit must be a number. Operation canceled.")
-            return
-
-        time_limit = int(time_message.text)
-        data["time_limits"][user_id] = time_limit
-        save_data()
-        await message.reply(f"✅ Time limit set to: {time_limit} seconds\n\nNow, let's add questions to your quiz.")
-
-        # Step 3: Add questions using polls
-        while True:
-            await message.reply(
-                "Send the question text as a poll with options.\n\n"
-                "Once you're done adding all questions, send /done."
-            )
-
-            question_message = await app.listen(message.chat.id, timeout=300)
-
-            # Handle the /done command
-            if question_message.text and question_message.text.lower() == "/done":
-                break
-
-            # Check if the message contains a poll
-            if question_message.poll:
-                poll = question_message.poll
-                question_text = poll.question
-                options = poll.options
-                correct_option_id = poll.correct_option_id
-
-                # Store the question data
-                data["questions"][user_id].append(
-                    {
-                        "question": question_text,
-                        "options": [option.text for option in options],
-                        "answer": correct_option_id,
-                    }
-                )
-                save_data()
-                await message.reply(f"✅ Question added: {question_text}")
-            else:
-                await message.reply("❌ Please send a valid poll with options.")
-    except asyncio.TimeoutError:
-        await message.reply("❌ Timeout! Operation canceled.")
+@app.on_message(filters.command("startquiz") & filters.group)
+async def start_quiz(client, message):
+    """Start the quiz and send the first question."""
+    if not quiz_data["questions"]:
+        await message.reply("No questions are available to start the quiz. Add questions first!")
         return
 
-    # Step 4: Confirm quiz creation
-    if data["questions"][user_id]:
-        await message.reply(
-            f"✅ Quiz '{data['titles'][user_id]}' created successfully with {len(data['questions'][user_id])} questions!"
-            f"\n\nTime limit per question: {data['time_limits'][user_id]} seconds"
-        )
+    quiz_data["group_id"] = message.chat.id
+    quiz_data["scores"].clear()
+    quiz_data["current_question"] = 0
+
+    await send_question(client)
+
+
+@app.on_message(filters.poll & filters.private)
+async def add_question_via_poll(client, message):
+    """
+    Add a question using a poll sent in private chat.
+    The poll must be a quiz with one correct answer.
+    """
+    poll = message.poll
+
+    if not poll.type == Poll.QUIZ:
+        await message.reply("Please send a quiz poll with a correct answer.")
+        return
+
+    if poll.correct_option_id is None:
+        await message.reply("The quiz poll must have a correct answer set.")
+        return
+
+    # Add the question to the quiz database
+    quiz_data["questions"].append({
+        "question": poll.question,
+        "options": poll.options,
+        "correct_option": poll.correct_option_id,
+    })
+
+    await message.reply("Question added successfully!")
+
+
+async def send_question(client):
+    """Send the current question as a poll."""
+    question_data = quiz_data["questions"][quiz_data["current_question"]]
+    await client.send_poll(
+        chat_id=quiz_data["group_id"],
+        question=question_data["question"],
+        options=[option.text for option in question_data["options"]],
+        is_anonymous=False,
+        type=Poll.QUIZ,
+        correct_option_id=question_data["correct_option"],
+    )
+
+
+@app.on_poll_answer()
+async def handle_poll_answer(client, poll_answer: PollAnswer):
+    """Handle user answers and update scores."""
+    user_id = poll_answer.user.id
+    selected_option = poll_answer.option_ids[0] if poll_answer.option_ids else None
+    question_data = quiz_data["questions"][quiz_data["current_question"]]
+
+    if user_id not in quiz_data["scores"]:
+        quiz_data["scores"][user_id] = 0
+
+    # Check if the answer is correct
+    if selected_option == question_data["correct_option"]:
+        quiz_data["scores"][user_id] += 1
     else:
-        await message.reply("❌ No questions were added. Operation canceled.")
-      
+        quiz_data["scores"][user_id] += NEGATIVE_MARKING
+
+    # Move to the next question or end the quiz
+    if quiz_data["current_question"] + 1 < len(quiz_data["questions"]):
+        quiz_data["current_question"] += 1
+        await send_question(client)
+    else:
+        await send_final_results(client)
 
 
+async def send_final_results(client):
+    """Send the final results to the group."""
+    group_id = quiz_data["group_id"]
+    scores = sorted(quiz_data["scores"].items(), key=lambda x: x[1], reverse=True)
 
-@app.on_message(filters.command("startq"))
-async def play_quiz(client, message: Message):
-    user_id = message.from_user.id
+    results = "**Quiz Results:**\n"
+    for user_id, score in scores:
+        user = await client.get_users(user_id)
+        results += f"{user.first_name}: {score} points\n"
 
-    # Check if the user has created any quizzes
-    if user_id not in data["questions"] or not data["questions"][user_id]:
-        await message.reply("❌ You haven't created any quizzes yet. Use /quiz to create one.")
-        return
-
-    questions = data["questions"][user_id]
-    time_limit = data["time_limits"][user_id]
-    score = 0
-
-    # Iterate over each question
-    for i, q in enumerate(questions):
-        # Prepare poll options
-        options = q["options"]
-        correct_answer = q.get("answer")  # Safely get the answer, default to None if not found
-
-        
-        # Send the poll to the user
-        try:
-            poll_message = await message.reply_poll(
-                question=f"Question {i + 1}/{len(questions)}:\n{q['question']}",
-                options=options,
-                is_anonymous=False,  # Allows user to see who voted for what
-                type="quiz",  # This will make the poll behave as a quiz
-                correct_option_id=correct_answer,  # Set the correct answer
-                explanation=f"The correct answer was option {correct_answer + 1}.",  # Explanation after poll
-            )
-
-            # Wait for the user's response
-            try:
-            # Wait for the user's response within the time limit
-                 answer_message = await app.listen(message.chat.id, timeout=time_limit)
+    await client.send_message(group_id, results)
     
-            # Ensure the answer_message is valid and contains text
-            if answer_message and answer_message.text and answer_message.text.isdigit():
-                 selected_option = int(answer_message.text) - 1
-            if selected_option == correct_answer:
-            score += 4
-                 await message.reply("✅ Correct! You earned +4 points.")
-          else:
-              score -= 0.25
-                 await message.reply(f"❌ Wrong! The correct answer was option {correct_answer + 1}. You lost 0.25 points.")
-          else:
-                 await message.reply("❌ Invalid response! No points deducted.")
-        except asyncio.TimeoutError:
-                 await message.reply("⏰ Time's up! Moving to the next question.")
-
-        except Exception as e:
-            # Handle unexpected errors, e.g., issues with sending the poll
-            await message.reply(f"❌ There was an error with question {i + 1}: {str(e)}. Skipping to the next question.")
-            continue  # Skip this question and go to the next one
-
-            # Display final score
-            await message.reply(f"🎉 Quiz completed! Your final score is: {score} points.")
