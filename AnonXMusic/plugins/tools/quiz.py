@@ -107,7 +107,7 @@ async def play_quiz(client, message: Message):
 
     for i, q in enumerate(questions):
         options_text = "\n".join([f"{j + 1}. {opt}" for j, opt in enumerate(q["options"])])
-        await message.reply_poll(
+        await message.chat.send_poll(
             f"Question {i + 1}/{len(questions)}:\n\n"
             f"{q['question']}\n\n"
             f"{options_text}\n\n"
