@@ -69,10 +69,12 @@ async def send_question(app):
     quiz_data["poll_ids"][poll_message.poll.id] = quiz_data["current_question"]
 
 
+from pyrogram.types import UpdatePollAnswer
+
 @app.on_raw_update()
 async def handle_poll_answer(app, update, users, chats):
     """Handle raw updates to capture poll answers."""
-    if isinstance(update, app.types.UpdatePollAnswer):
+    if isinstance(update, UpdatePollAnswer):
         poll_id = update.poll_id
         user_id = update.user_id
         selected_option = update.option_ids[0] if update.option_ids else None
@@ -100,6 +102,7 @@ async def handle_poll_answer(app, update, users, chats):
             await send_question(app)
         else:
             await send_final_results(app)
+        
 
 
 async def send_final_results(app):
