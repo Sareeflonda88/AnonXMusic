@@ -24,4 +24,4 @@ yt-dlp
 youtube-search
 youtube-search-python
 googletrans
-pyrotgfork
+pyrofork
