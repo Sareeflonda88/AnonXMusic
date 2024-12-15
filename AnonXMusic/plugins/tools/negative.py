@@ -112,12 +112,9 @@ async def play_quiz(client, message: Message):
     for i, q in enumerate(questions):
         # Prepare poll options
         options = q["options"]
-        correct_answer = q.get("answer", None)  # Safely get the answer, default to None if not found
+        correct_answer = q.get("answer")  # Safely get the answer, default to None if not found
 
-        if correct_answer is None:
-            await message.reply(f"❌ Question {i + 1} is missing a correct answer. Skipping this question.")
-            continue  # Skip this question and go to the next one
-
+        
         # Send the poll to the user
         try:
             poll_message = await message.reply_poll(
