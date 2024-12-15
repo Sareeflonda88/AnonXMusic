@@ -5,6 +5,7 @@ from AnonXMusic import app
 # Store quiz data and user scores
 quiz_data = {
     "questions": [],
+    "poll_ids": {},  # Maps poll_id to question index
     "scores": {},  # user_id: score
     "current_question": 0,
     "group_id": None,
@@ -13,7 +14,7 @@ quiz_data = {
 NEGATIVE_MARKING = -1  # Penalty for incorrect answers
 
 
-@app.on_message(filters.command("start_quiz") & filters.group)
+@Client.on_message(filters.command("start_quiz") & filters.group)
 async def start_quiz(client, message):
     """Start the quiz and send the first question."""
     if not quiz_data["questions"]:
@@ -27,7 +28,7 @@ async def start_quiz(client, message):
     await send_question(client)
 
 
-@app.on_message(filters.poll & filters.private)
+@Client.on_message(filters.poll & filters.private)
 async def add_question_via_poll(client, message):
     """
     Add a question using a poll sent in private chat.
@@ -56,7 +57,7 @@ async def add_question_via_poll(client, message):
 async def send_question(client):
     """Send the current question as a poll."""
     question_data = quiz_data["questions"][quiz_data["current_question"]]
-    await client.send_poll(
+    poll_message = await client.send_poll(
         chat_id=quiz_data["group_id"],
         question=question_data["question"],
         options=question_data["options"],
@@ -64,31 +65,42 @@ async def send_question(client):
         type=Poll.QUIZ,
         correct_option_id=question_data["correct_option"],
     )
+    # Map poll_id to the current question index
+    quiz_data["poll_ids"][poll_message.poll.id] = quiz_data["current_question"]
 
 
-@app.on_poll_answer()
-async def handle_poll_answer(client, update):
-    """Handle user answers and update scores."""
-    poll_answer = update.poll_answer
-    user_id = poll_answer.user.id
-    selected_option = poll_answer.option_ids[0] if poll_answer.option_ids else None
-    question_data = quiz_data["questions"][quiz_data["current_question"]]
+@Client.on_raw_update()
+async def handle_poll_answer(client, update, users, chats):
+    """Handle raw updates to capture poll answers."""
+    if update.get("poll_answer"):
+        poll_answer = update.poll_answer
+        poll_id = poll_answer.poll_id
+        user_id = poll_answer.user_id
+        selected_option = poll_answer.option_ids[0] if poll_answer.option_ids else None
 
-    if user_id not in quiz_data["scores"]:
-        quiz_data["scores"][user_id] = 0
+        # Find the question index using poll_id
+        question_index = quiz_data["poll_ids"].get(poll_id)
+        if question_index is None:
+            return  # Ignore if poll_id is not recognized
 
-    # Check if the answer is correct
-    if selected_option == question_data["correct_option"]:
-        quiz_data["scores"][user_id] += 1
-    else:
-        quiz_data["scores"][user_id] += NEGATIVE_MARKING
+        question_data = quiz_data["questions"][question_index]
 
-    # Move to the next question or end the quiz
-    if quiz_data["current_question"] + 1 < len(quiz_data["questions"]):
-        quiz_data["current_question"] += 1
-        await send_question(client)
-    else:
-        await send_final_results(client)
+        # Initialize user's score if not already
+        if user_id not in quiz_data["scores"]:
+            quiz_data["scores"][user_id] = 0
+
+        # Check if the answer is correct
+        if selected_option == question_data["correct_option"]:
+            quiz_data["scores"][user_id] += 1
+        else:
+            quiz_data["scores"][user_id] += NEGATIVE_MARKING
+
+        # Move to the next question or end the quiz
+        if quiz_data["current_question"] + 1 < len(quiz_data["questions"]):
+            quiz_data["current_question"] += 1
+            await send_question(client)
+        else:
+            await send_final_results(client)
 
 
 async def send_final_results(client):
@@ -102,3 +114,4 @@ async def send_final_results(client):
         results += f"{user.first_name}: {score} points\n"
 
     await client.send_message(group_id, results)
+            
