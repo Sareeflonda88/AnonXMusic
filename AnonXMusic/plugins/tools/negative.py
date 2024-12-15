@@ -95,9 +95,11 @@ async def quiz_command(client, message: Message):
 
 
 
-@app.on_message(filters.command("play_quiz"))
+@app.on_message(filters.command("startq"))
 async def play_quiz(client, message: Message):
     user_id = message.from_user.id
+
+    # Check if the user has created any quizzes
     if user_id not in data["questions"] or not data["questions"][user_id]:
         await message.reply("❌ You haven't created any quizzes yet. Use /quiz to create one.")
         return
@@ -106,38 +108,47 @@ async def play_quiz(client, message: Message):
     time_limit = data["time_limits"][user_id]
     score = 0
 
+    # Iterate over each question
     for i, q in enumerate(questions):
         # Prepare poll options
         options = q["options"]
-        correct_answer = q["answer"]
-        
+        correct_answer = q.get("answer", None)  # Safely get the answer, default to None if not found
+
+        if correct_answer is None:
+            await message.reply(f"❌ Question {i + 1} is missing a correct answer. Skipping this question.")
+            continue  # Skip this question and go to the next one
+
         # Send the poll to the user
-        poll_message = await message.reply_poll(
-            question=f"Question {i + 1}/{len(questions)}:\n{q['question']}",
-            options=options,
-            is_anonymous=False,  # Allows user to see who voted for what
-            type="quiz",  # This will make the poll behave as a quiz
-            correct_option_id=correct_answer,  # Set the correct answer
-            explanation=f"The correct answer was option {correct_answer + 1}.",  # Explanation after poll
-        )
-        
-        # Set a timeout for answering the poll
         try:
-            # Wait for the user response within the time limit
-            answer_message = await app.listen(message.chat.id, timeout=time_limit)
-            if answer_message.text.isdigit():
-                selected_option = int(answer_message.text) - 1
-                if selected_option == correct_answer:
-                    score += 4
-                    await message.reply("✅ Correct! You earned +4 points.")
+            poll_message = await message.reply_poll(
+                question=f"Question {i + 1}/{len(questions)}:\n{q['question']}",
+                options=options,
+                is_anonymous=False,  # Allows user to see who voted for what
+                type="quiz",  # This will make the poll behave as a quiz
+                correct_option_id=correct_answer,  # Set the correct answer
+                explanation=f"The correct answer was option {correct_answer + 1}.",  # Explanation after poll
+            )
+
+            # Wait for the user's response
+            try:
+                answer_message = await app.listen(message.chat.id, timeout=time_limit)
+                if answer_message.text.isdigit():
+                    selected_option = int(answer_message.text) - 1
+                    if selected_option == correct_answer:
+                        score += 4
+                        await message.reply("✅ Correct! You earned +4 points.")
+                    else:
+                        score -= 0.25
+                        await message.reply(f"❌ Wrong! The correct answer was option {correct_answer + 1}. You lost 0.25 points.")
                 else:
-                    score -= 0.25
-                    await message.reply(f"❌ Wrong! The correct answer was option {correct_answer + 1}. You lost 0.25 points.")
-            else:
-                await message.reply("❌ Invalid response! No points deducted.")
-        except asyncio.TimeoutError:
-            await message.reply("⏰ Time's up! Moving to the next question.")
+                    await message.reply("❌ Invalid response! No points deducted.")
+            except asyncio.TimeoutError:
+                await message.reply("⏰ Time's up! Moving to the next question.")
+
+        except Exception as e:
+            # Handle unexpected errors, e.g., issues with sending the poll
+            await message.reply(f"❌ There was an error with question {i + 1}: {str(e)}. Skipping to the next question.")
+            continue  # Skip this question and go to the next one
 
     # Display final score
     await message.reply(f"🎉 Quiz completed! Your final score is: {score} points.")
-      
