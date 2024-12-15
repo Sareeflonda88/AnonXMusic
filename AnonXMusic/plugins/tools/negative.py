@@ -91,7 +91,11 @@ async def quiz_command(client, message: Message):
         )
     else:
         await message.reply("❌ No questions were added. Operation canceled.")
-      # Play Quiz Command
+      
+
+
+
+# Play Quiz Command
 @app.on_message(filters.command("play_quiz"))
 async def play_quiz(client, message: Message):
     user_id = message.from_user.id
