@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import Poll, PollAnswer
+from pyrogram.types import Poll
 from AnonXMusic import app 
 
 # Store quiz data and user scores
@@ -13,7 +13,7 @@ quiz_data = {
 NEGATIVE_MARKING = -1  # Penalty for incorrect answers
 
 
-@app.on_message(filters.command("startquiz") & filters.group)
+@app.on_message(filters.command("start_quiz") & filters.group)
 async def start_quiz(client, message):
     """Start the quiz and send the first question."""
     if not quiz_data["questions"]:
@@ -46,7 +46,7 @@ async def add_question_via_poll(client, message):
     # Add the question to the quiz database
     quiz_data["questions"].append({
         "question": poll.question,
-        "options": poll.options,
+        "options": [option.text for option in poll.options],
         "correct_option": poll.correct_option_id,
     })
 
@@ -59,7 +59,7 @@ async def send_question(client):
     await client.send_poll(
         chat_id=quiz_data["group_id"],
         question=question_data["question"],
-        options=[option.text for option in question_data["options"]],
+        options=question_data["options"],
         is_anonymous=False,
         type=Poll.QUIZ,
         correct_option_id=question_data["correct_option"],
@@ -67,8 +67,9 @@ async def send_question(client):
 
 
 @app.on_poll_answer()
-async def handle_poll_answer(client, poll_answer: PollAnswer):
+async def handle_poll_answer(client, update):
     """Handle user answers and update scores."""
+    poll_answer = update.poll_answer
     user_id = poll_answer.user.id
     selected_option = poll_answer.option_ids[0] if poll_answer.option_ids else None
     question_data = quiz_data["questions"][quiz_data["current_question"]]
@@ -101,4 +102,3 @@ async def send_final_results(client):
         results += f"{user.first_name}: {score} points\n"
 
     await client.send_message(group_id, results)
-    
