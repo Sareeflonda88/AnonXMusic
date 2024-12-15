@@ -14,7 +14,7 @@ quiz_data = {
 NEGATIVE_MARKING = -1  # Penalty for incorrect answers
 
 
-@Client.on_message(filters.command("start_quiz") & filters.group)
+@app.on_message(filters.command("start_quiz") & filters.group)
 async def start_quiz(client, message):
     """Start the quiz and send the first question."""
     if not quiz_data["questions"]:
@@ -28,7 +28,7 @@ async def start_quiz(client, message):
     await send_question(client)
 
 
-@Client.on_message(filters.poll & filters.private)
+@app.on_message(filters.poll & filters.private)
 async def add_question_via_poll(client, message):
     """
     Add a question using a poll sent in private chat.
@@ -69,7 +69,7 @@ async def send_question(client):
     quiz_data["poll_ids"][poll_message.poll.id] = quiz_data["current_question"]
 
 
-@Client.on_raw_update()
+@app.on_raw_update()
 async def handle_poll_answer(client, update, users, chats):
     """Handle raw updates to capture poll answers."""
     if update.get("poll_answer"):
