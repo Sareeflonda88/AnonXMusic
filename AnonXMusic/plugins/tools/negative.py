@@ -47,11 +47,11 @@ async def cancel(client, message):
     await message.reply("Question addition process has been canceled.")
 
 # Handling Poll Answers with on_message instead of on_poll_answer
-@app.on_message(filters.poll_answer)
+@app.on_message(filters.poll)
 async def handle_poll_answer(client, message):
-    poll_answer = message.poll_answer
-    user_id = poll_answer.user.id
-    selected_option = poll_answer.option_ids[0]
+    poll = message.poll
+    user_id = poll.user.id
+    selected_option = poll.option_ids[0]
 
     # You can store or use the results here
     await client.send_message(user_id, f"You selected option: {selected_option}")
