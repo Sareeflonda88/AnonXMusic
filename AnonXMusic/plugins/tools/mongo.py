@@ -25,21 +25,6 @@ user_data = {}
 bot_start_time = time.time()
 
 
-
-# Helper function to format bot uptime
-async def get_uptime():
-    uptime_seconds = int(time.time() - bot_start_time)
-    hours, remainder = divmod(uptime_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{hours}h {minutes}m {seconds}s"
-
-# Helper function to get system info
-async def get_system_info():
-    # Get system CPU usage and memory info
-    cpu_usage = psutil.cpu_percent(interval=1)
-    memory = psutil.virtual_memory()
-    return cpu_usage, memory.percent
-
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ObjectId):
@@ -174,23 +159,6 @@ async def import_database(client, message):
         await mystic.edit_text(f"Error during import: {e}. Rolling back changes.")
     os.remove(file_path)
     
-
-
-# Define the /start command
-@app.on_message(filters.command("start"))
-async def start_command(client, message):
-    start_text = """
-        **👋 Welcome to the MongoDB Transfer Bot!**
-        /start - Start the bot
-        /setold `<old_mongo_uri>` - Set old MongoDB URI
-        /setnew `<new_mongo_uri>` - Set new MongoDB URI
-        /transfer `<transfer_data>` - Start transferring data
-        /listalldb `<see_data>` - List all databases in the old MongoDB instance
-        /status `<status_process>` - Check bot status
-        /ping `<uptime_bot>` - Get system info and bot uptime
-        /clean `<delete_data>` - This cmd can delete all your entire data which is stored in your mongo db database
-    """
-    await message.reply(start_text)
 
 
 @app.on_message(filters.command("nstart"))
@@ -358,31 +326,6 @@ async def status(client, message):
     await message.reply_text("**Bot is running and ready to transfer data.**", parse_mode=ParseMode.MARKDOWN)
 
 
-@app.on_message(filters.command("clean"))
-async def delete_all_databases(client, message):
-    
-
-    if len(message.command) < 2:
-        return await message.reply_text("Please provide a MongoDB URL as an argument.")
-
-    mongo_url = message.command[1].strip()
-    mystic = await message.reply_text("Connecting to MongoDB...")
-
-    try:
-        client = AsyncIOMotorClient(mongo_url)
-        databases = await client.list_database_names()
-        databases = [db for db in databases if db not in ["local", "admin"]]
-
-        if not databases:
-            return await mystic.edit_text("No user-defined databases to delete.")
-
-        for db_name in databases:
-            await client.drop_database(db_name)
-
-        await mystic.edit_text("All user-defined databases have been deleted successfully.")
-    except Exception as e:
-        await mystic.edit_text(f"Error: {e}")        
-         
 
 @app.on_message(filters.command("ping"))
 async def check_sping(client, message):
