@@ -1,13 +1,10 @@
-# bot.py
-import logging
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Poll
 from pyrogram.enums import PollType
 from AnonXMusic import app, LOGGER
 
-
 # Add question handler
-@app.on_message(filters.command("add"))
+@app.on_message(filters.command("addquestion"))
 async def add_question(client, message):
     await message.reply(
         "Please send the question for the quiz. For example: What is 2 + 2?"
@@ -49,12 +46,12 @@ async def add_question(client, message):
 async def cancel(client, message):
     await message.reply("Question addition process has been canceled.")
 
-# Poll answer handler
-@app.on_poll_answer()
-async def handle_poll_answer(client, poll_answer):
-    # Handle user answers here
-    # poll_answer.user.id contains the user ID, poll_answer.option_ids contains the selected options
+# Handling Poll Answers with on_message instead of on_poll_answer
+@app.on_message(filters.poll_answer)
+async def handle_poll_answer(client, message):
+    poll_answer = message.poll_answer
     user_id = poll_answer.user.id
     selected_option = poll_answer.option_ids[0]
-    # You can store the results or respond based on the selected option
+
+    # You can store or use the results here
     await client.send_message(user_id, f"You selected option: {selected_option}")
