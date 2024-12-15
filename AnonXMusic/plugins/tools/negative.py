@@ -95,7 +95,6 @@ async def quiz_command(client, message: Message):
 
 
 
-# Play Quiz Command
 @app.on_message(filters.command("play_quiz"))
 async def play_quiz(client, message: Message):
     user_id = message.from_user.id
@@ -108,25 +107,32 @@ async def play_quiz(client, message: Message):
     score = 0
 
     for i, q in enumerate(questions):
-        options_text = "\n".join([f"{j + 1}. {opt}" for j, opt in enumerate(q["options"])])
-        await message.reply(
-            f"Question {i + 1}/{len(questions)}:\n\n"
-            f"{q['question']}\n\n"
-            f"{options_text}\n\n"
-            f"⏳ You have {time_limit} seconds to answer."
+        # Prepare poll options
+        options = q["options"]
+        correct_answer = q["answer"]
+        
+        # Send the poll to the user
+        poll_message = await message.reply_poll(
+            question=f"Question {i + 1}/{len(questions)}:\n{q['question']}",
+            options=options,
+            is_anonymous=False,  # Allows user to see who voted for what
+            type="quiz",  # This will make the poll behave as a quiz
+            correct_option_id=correct_answer,  # Set the correct answer
+            explanation=f"The correct answer was option {correct_answer + 1}.",  # Explanation after poll
         )
-
+        
+        # Set a timeout for answering the poll
         try:
+            # Wait for the user response within the time limit
             answer_message = await app.listen(message.chat.id, timeout=time_limit)
-
             if answer_message.text.isdigit():
                 selected_option = int(answer_message.text) - 1
-                if selected_option == q["answer"]:
+                if selected_option == correct_answer:
                     score += 4
                     await message.reply("✅ Correct! You earned +4 points.")
                 else:
                     score -= 0.25
-                    await message.reply(f"❌ Wrong! The correct answer was option {q['answer'] + 1}. You lost 0.25 points.")
+                    await message.reply(f"❌ Wrong! The correct answer was option {correct_answer + 1}. You lost 0.25 points.")
             else:
                 await message.reply("❌ Invalid response! No points deducted.")
         except asyncio.TimeoutError:
@@ -134,30 +140,4 @@ async def play_quiz(client, message: Message):
 
     # Display final score
     await message.reply(f"🎉 Quiz completed! Your final score is: {score} points.")
-
-# Start Command
-@app.on_message(filters.command("nstart"))
-async def start(client, message: Message):
-    user_name = message.from_user.first_name
-    keyboard = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("👤 Owner", url="https://t.me/your_owner_username"),
-                InlineKeyboardButton("🛠 Maintainer", url="https://t.me/your_maintainer_username"),
-            ],
-            [
-                InlineKeyboardButton("📦 Source Code", url="https://github.com/your-repo-url"),
-            ],
-        ]
-    )
-    await message.reply(
-        f"Hi {user_name}!\n\n"
-        "I am a Negative Marking Quiz Bot with 0.25 Negative Marking.\n\n"
-        "You can use me to create and play custom quizzes with a time limit.\n\n"
-        "➡️ Use /quiz to create a custom quiz.\n"
-        "➡️ Use /play_quiz to play your quiz.\n"
-        "➡️ Use /translate to translate messages and polls into different languages.\n\n"
-        "Start exploring now and have fun learning!",
-        reply_markup=keyboard,
-                  )
       
