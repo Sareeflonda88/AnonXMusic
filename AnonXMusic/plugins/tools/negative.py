@@ -1,4 +1,4 @@
-from pyrogram import Client, filters
+from pyrogram import filters
 from pyrogram.types import Poll
 from AnonXMusic import app 
 
@@ -15,7 +15,7 @@ NEGATIVE_MARKING = -1  # Penalty for incorrect answers
 
 
 @app.on_message(filters.command("start_quiz") & filters.group)
-async def start_quiz(client, message):
+async def start_quiz(app, message):
     """Start the quiz and send the first question."""
     if not quiz_data["questions"]:
         await message.reply("No questions are available to start the quiz. Add questions first!")
@@ -25,18 +25,18 @@ async def start_quiz(client, message):
     quiz_data["scores"].clear()
     quiz_data["current_question"] = 0
 
-    await send_question(client)
+    await send_question(app)
 
 
 @app.on_message(filters.poll & filters.private)
-async def add_question_via_poll(client, message):
+async def add_question_via_poll(app, message):
     """
     Add a question using a poll sent in private chat.
     The poll must be a quiz with one correct answer.
     """
     poll = message.poll
 
-    if not poll.type == Poll.QUIZ:
+    if poll.type != "quiz":  # Compare directly with the string "quiz"
         await message.reply("Please send a quiz poll with a correct answer.")
         return
 
@@ -54,10 +54,10 @@ async def add_question_via_poll(client, message):
     await message.reply("Question added successfully!")
 
 
-async def send_question(client):
+async def send_question(app):
     """Send the current question as a poll."""
     question_data = quiz_data["questions"][quiz_data["current_question"]]
-    poll_message = await client.send_poll(
+    poll_message = await app.send_poll(
         chat_id=quiz_data["group_id"],
         question=question_data["question"],
         options=question_data["options"],
@@ -70,13 +70,12 @@ async def send_question(client):
 
 
 @app.on_raw_update()
-async def handle_poll_answer(client, update, users, chats):
+async def handle_poll_answer(app, update, users, chats):
     """Handle raw updates to capture poll answers."""
-    if update.get("poll_answer"):
-        poll_answer = update.poll_answer
-        poll_id = poll_answer.poll_id
-        user_id = poll_answer.user_id
-        selected_option = poll_answer.option_ids[0] if poll_answer.option_ids else None
+    if isinstance(update, app.types.UpdatePollAnswer):
+        poll_id = update.poll_id
+        user_id = update.user_id
+        selected_option = update.option_ids[0] if update.option_ids else None
 
         # Find the question index using poll_id
         question_index = quiz_data["poll_ids"].get(poll_id)
@@ -98,20 +97,19 @@ async def handle_poll_answer(client, update, users, chats):
         # Move to the next question or end the quiz
         if quiz_data["current_question"] + 1 < len(quiz_data["questions"]):
             quiz_data["current_question"] += 1
-            await send_question(client)
+            await send_question(app)
         else:
-            await send_final_results(client)
+            await send_final_results(app)
 
 
-async def send_final_results(client):
+async def send_final_results(app):
     """Send the final results to the group."""
     group_id = quiz_data["group_id"]
     scores = sorted(quiz_data["scores"].items(), key=lambda x: x[1], reverse=True)
 
     results = "**Quiz Results:**\n"
     for user_id, score in scores:
-        user = await client.get_users(user_id)
+        user = await app.get_users(user_id)
         results += f"{user.first_name}: {score} points\n"
 
-    await client.send_message(group_id, results)
-            
+    await app.send_message(group_id, results)
