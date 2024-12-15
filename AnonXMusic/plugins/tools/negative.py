@@ -2,6 +2,7 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.enums import PollType
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from AnonXMusic import app 
 
 # Enable logging for debugging
 logging.basicConfig(level=logging.INFO)
