@@ -150,5 +150,5 @@ async def play_quiz(client, message: Message):
             await message.reply(f"❌ There was an error with question {i + 1}: {str(e)}. Skipping to the next question.")
             continue  # Skip this question and go to the next one
 
-    # Display final score
-    await message.reply(f"🎉 Quiz completed! Your final score is: {score} points.")
+            # Display final score
+            await message.reply(f"🎉 Quiz completed! Your final score is: {score} points.")
