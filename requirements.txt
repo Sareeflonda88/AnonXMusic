@@ -13,7 +13,6 @@ pillow
 psutil
 py-tgcalls==0.9.7
 pykeyboard
-pyrofork
 python-dotenv
 pyyaml
 requests
@@ -25,3 +24,4 @@ yt-dlp
 youtube-search
 youtube-search-python
 googletrans
+pyrotgfork
