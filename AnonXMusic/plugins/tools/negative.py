@@ -5,7 +5,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, 
 from AnonXMusic import app
 
 
-ADMIN_IDS = [6644859358]  # Replace with your Telegram user ID(s)
+ADMIN_IDS = [7648939888]  # Replace with your Telegram user ID(s)
 
 # Load data (scores, quiz progress, and questions)
 try:
